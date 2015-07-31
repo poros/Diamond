@@ -201,6 +201,57 @@ class Server(object):
 
                 ##############################################################
 
+                ##############################################################
+                # Handlers
+                #
+                # This part is simplified respect to collectors because
+                # handlers do nor support configuration reloading
+                # TODO: Implement configuration reloading for handlers
+                ##############################################################
+
+                running_handlers = set(self.handlers.values())
+
+                handler_classes = dict(
+                    (cls.__name__.split('.')[-1], cls)
+                    for cls in handlers.values()
+                )
+
+                for process_name in running_handlers - running_processes:
+                    # Copied from collectors
+                    # Not sure it applies also to handlers
+                    handler_name = process_name.split()[0]
+
+                    if 'Handler' not in handler_name:
+                        continue
+
+                    if handler_name not in handler_classes:
+                        self.log.error('Can not find handler %s',
+                                       handler_name)
+                        continue
+
+                    handler = initialize_handler(
+                        handler_classes[handler_name],
+                        name=process_name,
+                        config=self.config)
+
+                    if handler is None:
+                        self.log.error('Failed to load handler %s',
+                                       process_name)
+                        continue
+
+                    # Splay the loads
+                    time.sleep(1)
+
+                    process = multiprocessing.Process(
+                        name=process_name,
+                        target=handler_process,
+                        args=(handler, pipe, self.log)
+                        )
+                    process.daemon = True
+                    process.start()
+
+                ##############################################################
+
                 time.sleep(1)
 
             except SIGHUPException:

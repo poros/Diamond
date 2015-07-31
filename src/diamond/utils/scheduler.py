@@ -97,18 +97,31 @@ def collector_process(collector, metric_queue, log):
             break
 
 
-def handler_process(handlers, metric_queue, log):
+def handler_process(handler, pipe, log):
+    """
+    """
     proc = multiprocessing.current_process()
     if setproctitle:
         setproctitle('%s - %s' % (getproctitle(), proc.name))
 
+    signal.signal(signal.SIGHUP, signal_to_exception)
+
     log.debug('Starting process %s', proc.name)
 
     while(True):
-        metrics = metric_queue.get(block=True, timeout=None)
-        for metric in metrics:
-            for handler in handlers:
+        try:
+            metrics = pipe.recv()
+
+            for metric in metrics:
                 handler._process(metric)
 
-        for handler in handlers:
             handler._flush()
+
+        except SIGHUPException:
+            # TODO: refactor handlers so they can reload configs
+            log.debug("Handlers can't reload configs!")
+            pass
+
+        except Exception:
+            log.exception('Handler failed!')
+            break
