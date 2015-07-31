@@ -47,7 +47,40 @@ def load_dynamic_class(fqn, subclass):
     return cls
 
 
+def load_handlers(config, handler_names):
+    """
+    Load handlers
+    """
+    log = logging.getLogger('diamond')
+
+    handlers = []
+
+    if isinstance(handler_names, basestring):
+        handler_names = [handler_names]
+
+    for handler in handler_names:
+        log.debug('Loading Handler %s', handler)
+        try:
+            # Load Handler Class
+            cls = load_dynamic_class(handler, Handler)
+            # Add Handler class
+            handlers[cls.__name__] = cls
+        except (ImportError, SyntaxError):
+            # Log Error
+            log.warning("Failed to load handler %s. %s",
+                        handler,
+                        traceback.format_exc())
+            continue
+
+    return handlers
+
+
 def load_handler_config(config, handler_name):
+    """
+    Load configuration for an handler. It differs from collectors since they
+    implement a method for configuration loading based on configfile passed as
+    class argument.
+    """
     # Initialize Handler config
     handler_config = configobj.ConfigObj()
     # Merge default Handler default config
@@ -69,38 +102,25 @@ def load_handler_config(config, handler_name):
     return handler_config
 
 
-def load_handlers(config, handler_names):
+def initialize_handler(cls, name, config):
     """
-    Load handlers
+    Initialize handler
     """
     log = logging.getLogger('diamond')
+    handler = None
 
-    handlers = []
+    try:
+        # Load handler configuration
+        handler_config = load_handler_config(config, name)
 
-    if isinstance(handler_names, basestring):
-        handler_names = [handler_names]
+        # Initialize Handler
+        handler = cls(handler_config)
+    except Exception:
+        # Log error
+        log.error("Failed to initialize handler: %s. %s",
+                  cls.__name__, traceback.format_exc())
 
-    for handler in handler_names:
-        log.debug('Loading Handler %s', handler)
-        try:
-            # Load Handler Class
-            cls = load_dynamic_class(handler, Handler)
-            cls_name = cls.__name__
-
-            handler_config = load_handler_config(config, cls_name)
-
-            # Initialize Handler class
-            h = cls(handler_config)
-            handlers.append(h)
-
-        except (ImportError, SyntaxError):
-            # Log Error
-            log.warning("Failed to load handler %s. %s",
-                        handler,
-                        traceback.format_exc())
-            continue
-
-    return handlers
+    return handler
 
 
 def load_collectors(paths=None, filter=None):

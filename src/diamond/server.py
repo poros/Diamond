@@ -19,6 +19,7 @@ sys.path.append(
             os.path.dirname(__file__), "../")))
 
 from diamond.utils.classes import initialize_collector
+from diamond.utils.classes import initialize_handler
 from diamond.utils.classes import load_collectors
 from diamond.utils.classes import load_dynamic_class
 from diamond.utils.classes import load_handlers
@@ -74,8 +75,6 @@ class Server(object):
 
         ########################################################################
         # Handlers
-        #
-        # TODO: Eventually move each handler to it's own process space?
         ########################################################################
 
         if 'handlers_path' in self.config['server']:
@@ -102,6 +101,10 @@ class Server(object):
             handlers.remove('diamond.handler.queue.QueueHandler')
 
         self.handlers = load_handlers(self.config, handlers)
+        self.handlers = [
+            initialize_handler(handler_cls, handler_name, self.config)
+            for handler_cls, handler_name in self.handlers
+        ]
 
         QueueHandler = load_dynamic_class(
             'diamond.handler.queue.QueueHandler',
