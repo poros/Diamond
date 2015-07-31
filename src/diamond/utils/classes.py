@@ -47,6 +47,28 @@ def load_dynamic_class(fqn, subclass):
     return cls
 
 
+def load_handler_config(config, handler_name):
+    # Initialize Handler config
+    handler_config = configobj.ConfigObj()
+    # Merge default Handler default config
+    handler_config.merge(config['handlers']['default'])
+    # Check if Handler config exists
+    if handler_name in config['handlers']:
+        # Merge Handler config section
+        handler_config.merge(config['handlers'][handler_name])
+
+    # Check for config file in config directory
+    if 'handlers_config_path' in config['server']:
+        configfile = os.path.join(
+            config['server']['handlers_config_path'],
+            handler_name) + '.conf'
+        if os.path.exists(configfile):
+            # Merge Collector config file
+            handler_config.merge(configobj.ConfigObj(configfile))
+
+    return handler_config
+
+
 def load_handlers(config, handler_names):
     """
     Load handlers
@@ -65,23 +87,7 @@ def load_handlers(config, handler_names):
             cls = load_dynamic_class(handler, Handler)
             cls_name = cls.__name__
 
-            # Initialize Handler config
-            handler_config = configobj.ConfigObj()
-            # Merge default Handler default config
-            handler_config.merge(config['handlers']['default'])
-            # Check if Handler config exists
-            if cls_name in config['handlers']:
-                # Merge Handler config section
-                handler_config.merge(config['handlers'][cls_name])
-
-            # Check for config file in config directory
-            if 'handlers_config_path' in config['server']:
-                configfile = os.path.join(
-                    config['server']['handlers_config_path'],
-                    cls_name) + '.conf'
-                if os.path.exists(configfile):
-                    # Merge Collector config file
-                    handler_config.merge(configobj.ConfigObj(configfile))
+            handler_config = load_handler_config(config, cls_name)
 
             # Initialize Handler class
             h = cls(handler_config)
